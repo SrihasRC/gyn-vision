@@ -20,6 +20,7 @@ export default function SegmentationPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [sampleRate, setSampleRate] = useState<number>(15); // Default: ~2fps (every 15th frame)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +69,7 @@ export default function SegmentationPage() {
         const result = await segmentImage(selectedFile, selectedModelId);
         setImageResult(result);
       } else {
-        const url = await segmentVideo(selectedFile, selectedModelId);
+        const url = await segmentVideo(selectedFile, selectedModelId, sampleRate);
         setVideoUrl(url);
       }
     } catch (err: unknown) {
@@ -120,6 +121,73 @@ export default function SegmentationPage() {
                   onChange={handleModeChange}
                   disabled={loading}
                 />
+
+                {/* Video Sample Rate Slider - Only show for video mode */}
+                {mode === 'video' && (
+                  <div className="space-y-3">
+                    <label className="text-xs font-medium">Processing Speed</label>
+                    
+                    {/* Preset Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        type="button"
+                        variant={sampleRate === 30 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSampleRate(30)}
+                        disabled={loading}
+                        className="text-xs h-8"
+                      >
+                        Fast
+                        <span className="text-[10px] ml-1 opacity-70">(1fps)</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={sampleRate === 15 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSampleRate(15)}
+                        disabled={loading}
+                        className="text-xs h-8"
+                      >
+                        Balanced
+                        <span className="text-[10px] ml-1 opacity-70">(2fps)</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={sampleRate === 5 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSampleRate(5)}
+                        disabled={loading}
+                        className="text-xs h-8"
+                      >
+                        Quality
+                        <span className="text-[10px] ml-1 opacity-70">(6fps)</span>
+                      </Button>
+                    </div>
+
+                    {/* Custom Slider */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground">Custom:</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="30"
+                          value={sampleRate}
+                          onChange={(e) => setSampleRate(Number(e.target.value))}
+                          disabled={loading}
+                          className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                        <span className="text-xs font-medium min-w-[60px]">
+                          ~{sampleRate}x faster
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Processing every {sampleRate === 1 ? '' : `${sampleRate}${sampleRate === 2 ? 'nd' : sampleRate === 3 ? 'rd' : 'th'} `}frame{sampleRate === 1 ? '' : 's'} 
+                        {' '}({Math.round(30 / sampleRate)} frames/sec at 30fps input)
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <FileUpload
                   mode={mode}

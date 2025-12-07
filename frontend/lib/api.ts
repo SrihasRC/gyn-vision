@@ -56,12 +56,14 @@ export async function segmentImage(
  */
 export async function segmentVideo(
   file: File,
-  modelId: string
+  modelId: string,
+  sampleRate: number = 15
 ): Promise<string> {
   try {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('model_id', modelId);
+    formData.append('sample_rate', sampleRate.toString());
 
     const response = await axios.post(
       `${API_BASE_URL}/segment/video`,

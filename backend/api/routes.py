@@ -105,7 +105,8 @@ async def segment_image(
 async def segment_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    model_id: str = Form(...)
+    model_id: str = Form(...),
+    sample_rate: int = Form(15)  # Process every 15th frame (~2fps at 30fps input)
 ):
     """
     Segment video and return processed video with overlay.
@@ -113,11 +114,15 @@ async def segment_video(
     Args:
         file: Uploaded video file
         model_id: Model identifier
+        sample_rate: Process every Nth frame (1-30, default 15 for ~15x speedup)
         
     Returns:
         Video file with segmentation overlay
     """
     try:
+        # Validate sample_rate
+        sample_rate = max(1, min(30, sample_rate))  # Clamp between 1 and 30
+        
         # Get model
         registry = get_registry()
         session, config = registry.get_model(model_id)
@@ -130,7 +135,8 @@ async def segment_video(
         output_path = create_video_with_overlay(
             file_bytes,
             session,
-            config
+            config,
+            sample_rate=sample_rate
         )
         print(f"Video created at: {output_path}")
         

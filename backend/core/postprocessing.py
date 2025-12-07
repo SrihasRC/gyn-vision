@@ -242,16 +242,18 @@ def create_video_with_overlay(
     video_bytes: bytes,
     session,
     config: Dict,
-    output_path: str = None
+    output_path: str = None,
+    sample_rate: int = 15  # Process every 15th frame (~2fps at 30fps)
 ) -> str:
     """
-    Process entire video and create output video with segmentation overlays.
+    Process video with frame sampling and create output video with segmentation overlays.
     
     Args:
         video_bytes: Raw video bytes
         session: ONNX Runtime InferenceSession
         config: Model configuration
         output_path: Optional output path for video file
+        sample_rate: Process every Nth frame (default 15 = ~2fps at 30fps input)
         
     Returns:
         Path to output video file
@@ -280,7 +282,9 @@ def create_video_with_overlay(
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
+        estimated_processed = total_frames // sample_rate
         print(f"Video properties: {width}x{height} @ {fps}fps, {total_frames} frames")
+        print(f"Frame sampling: Processing 1 out of every {sample_rate} frames (~{estimated_processed} frames)")
         
         # Create video writer with H.264 codec for web compatibility
         # Try different codecs in order of preference
@@ -307,6 +311,9 @@ def create_video_with_overlay(
         std = config.get('std')
         
         frame_count = 0
+        processed_count = 0
+        last_overlay_bgr = None
+        
         # Process each frame
         while True:
             ret, frame = cap.read()
@@ -314,52 +321,64 @@ def create_video_with_overlay(
                 break
             
             frame_count += 1
-            if frame_count % 30 == 0:  # Log every 30 frames
-                print(f"Processed {frame_count}/{total_frames} frames")
             
-            # Convert BGR to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            original_frame = Image.fromarray(frame_rgb)
+            # Decide if we should process this frame or reuse last overlay
+            should_process = (frame_count - 1) % sample_rate == 0
             
-            # Resize for model
-            resized_frame = original_frame.resize(
-                (input_size, input_size),
-                Image.BILINEAR
-            )
+            if should_process:
+                processed_count += 1
+                
+                # Convert BGR to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                original_frame = Image.fromarray(frame_rgb)
+                
+                # Resize for model
+                resized_frame = original_frame.resize(
+                    (input_size, input_size),
+                    Image.BILINEAR
+                )
+                
+                # Convert to numpy and normalize
+                img_array = np.array(resized_frame, dtype=np.float32) / 255.0
+                
+                if normalize and mean is not None and std is not None:
+                    mean_arr = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
+                    std_arr = np.array(std, dtype=np.float32).reshape(1, 1, 3)
+                    img_array = (img_array - mean_arr) / std_arr
+                
+                # Transpose and add batch dimension
+                img_array = np.transpose(img_array, (2, 0, 1))
+                input_tensor = np.expand_dims(img_array, axis=0)
+                
+                # Run inference
+                logits = run_inference(session, input_tensor)
+                
+                # Generate overlay
+                result = process_segmentation_result(
+                    logits,
+                    original_frame,
+                    original_frame.size
+                )
+                
+                # Convert overlay to OpenCV format (RGB -> BGR)
+                overlay_np = np.array(result['overlay_image'])
+                last_overlay_bgr = cv2.cvtColor(overlay_np, cv2.COLOR_RGB2BGR)
+                
+                if processed_count % 10 == 0:  # Log every 10 processed frames
+                    print(f"Processed {processed_count}/{estimated_processed} key frames ({frame_count}/{total_frames} total)")
             
-            # Convert to numpy and normalize
-            img_array = np.array(resized_frame, dtype=np.float32) / 255.0
-            
-            if normalize and mean is not None and std is not None:
-                mean_arr = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
-                std_arr = np.array(std, dtype=np.float32).reshape(1, 1, 3)
-                img_array = (img_array - mean_arr) / std_arr
-            
-            # Transpose and add batch dimension
-            img_array = np.transpose(img_array, (2, 0, 1))
-            input_tensor = np.expand_dims(img_array, axis=0)
-            
-            # Run inference
-            logits = run_inference(session, input_tensor)
-            
-            # Generate overlay
-            result = process_segmentation_result(
-                logits,
-                original_frame,
-                original_frame.size
-            )
-            
-            # Convert overlay to OpenCV format (RGB -> BGR)
-            overlay_np = np.array(result['overlay_image'])
-            overlay_bgr = cv2.cvtColor(overlay_np, cv2.COLOR_RGB2BGR)
-            
-            # Write frame
-            out.write(overlay_bgr)
+            # Write frame (either newly processed or reused overlay)
+            if last_overlay_bgr is not None:
+                out.write(last_overlay_bgr)
+            else:
+                # Fallback: write original frame if no overlay yet
+                out.write(frame)
         
         cap.release()
         out.release()
         
-        print(f"Video processing complete. Total frames: {frame_count}")
+        print(f"Video processing complete. Total frames: {frame_count}, Processed: {processed_count}")
+        print(f"Speed improvement: ~{sample_rate}x faster")
         print(f"Output video saved to: {output_path}")
         
         # Re-encode with ffmpeg for better web compatibility
