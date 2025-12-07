@@ -1,2 +1,31 @@
 context.md
 plans/
+
+# Large model files (use Git LFS or download separately)
+backend/models/*.onnx
+backend/models/onnx/*.onnx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.log
