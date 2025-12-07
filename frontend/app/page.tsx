@@ -13,9 +13,25 @@ export default function Home() {
       
       {/* Hero Section - Full Screen */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Animated Background */}
+        {/* Cool Blue Glow Background */}
+        <div
+          className="absolute inset-0 -z-999"
+          style={{
+            background: "#ffffff",
+            backgroundImage: `
+              radial-gradient(
+                circle at top center,
+                rgba(70, 130, 180, 0.5),
+                transparent 70%
+              )
+            `,
+            filter: "blur(80px)",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+        
+        {/* Additional Animated Elements */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-linear(circle_at_50%_50%,rgba(var(--primary-rgb,99,102,241),0.1),transparent_50%)]" />
           <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
           <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-1000" />
         </div>
