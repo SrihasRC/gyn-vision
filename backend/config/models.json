@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "id": "segformer_b0",
+      "name": "SegFormer B0",
+      "description": "Fast inference, good for real-time",
+      "type": "segformer",
+      "onnx_path": "models/segformer_b0.onnx",
+      "input_size": 512,
+      "num_classes": 4,
+      "normalize": true,
+      "mean": [0.485, 0.456, 0.406],
+      "std": [0.229, 0.224, 0.225]
+    },
+    {
+      "id": "segformer_b1",
+      "name": "SegFormer B1",
+      "description": "Balanced speed and accuracy",
+      "type": "segformer",
+      "onnx_path": "models/segformer_b1.onnx",
+      "input_size": 512,
+      "num_classes": 4,
+      "normalize": true,
+      "mean": [0.485, 0.456, 0.406],
+      "std": [0.229, 0.224, 0.225]
+    },
+    {
+      "id": "segformer_b2",
+      "name": "SegFormer B2",
+      "description": "Higher accuracy, slower inference",
+      "type": "segformer",
+      "onnx_path": "models/segformer_b2.onnx",
+      "input_size": 512,
+      "num_classes": 4,
+      "normalize": true,
+      "mean": [0.485, 0.456, 0.406],
+      "std": [0.229, 0.224, 0.225]
+    }
+  ]
+}
