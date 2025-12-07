@@ -3,6 +3,9 @@ Postprocessing pipeline for generating masks, overlays, and statistics.
 """
 import io
 import base64
+import tempfile
+import subprocess
+import os
 import numpy as np
 from PIL import Image
 import cv2
@@ -233,3 +236,154 @@ def aggregate_video_statistics(frames_stats: List[List[Dict]]) -> List[Dict]:
         })
     
     return aggregated
+
+
+def create_video_with_overlay(
+    video_bytes: bytes,
+    session,
+    config: Dict,
+    output_path: str = None
+) -> str:
+    """
+    Process entire video and create output video with segmentation overlays.
+    
+    Args:
+        video_bytes: Raw video bytes
+        session: ONNX Runtime InferenceSession
+        config: Model configuration
+        output_path: Optional output path for video file
+        
+    Returns:
+        Path to output video file
+    """
+    # Save input to temporary file
+    with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_in:
+        tmp_in.write(video_bytes)
+        tmp_in_path = tmp_in.name
+    
+    # Create output path
+    if output_path is None:
+        tmp_out = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        output_path = tmp_out.name
+        tmp_out.close()
+    
+    try:
+        # Open input video
+        cap = cv2.VideoCapture(tmp_in_path)
+        
+        if not cap.isOpened():
+            raise ValueError("Failed to open video file")
+        
+        # Get video properties
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        print(f"Video properties: {width}x{height} @ {fps}fps, {total_frames} frames")
+        
+        # Create video writer with H.264 codec for web compatibility
+        # Try different codecs in order of preference
+        codecs = ['avc1', 'H264', 'X264', 'mp4v']
+        out = None
+        
+        for codec in codecs:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+                if out.isOpened():
+                    print(f"Using codec: {codec}")
+                    break
+                out.release()
+            except:
+                continue
+        
+        if out is None or not out.isOpened():
+            raise ValueError("Failed to create output video with any codec")
+        
+        input_size = config['input_size']
+        normalize = config['normalize']
+        mean = config.get('mean')
+        std = config.get('std')
+        
+        frame_count = 0
+        # Process each frame
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            frame_count += 1
+            if frame_count % 30 == 0:  # Log every 30 frames
+                print(f"Processed {frame_count}/{total_frames} frames")
+            
+            # Convert BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            original_frame = Image.fromarray(frame_rgb)
+            
+            # Resize for model
+            resized_frame = original_frame.resize(
+                (input_size, input_size),
+                Image.BILINEAR
+            )
+            
+            # Convert to numpy and normalize
+            img_array = np.array(resized_frame, dtype=np.float32) / 255.0
+            
+            if normalize and mean is not None and std is not None:
+                mean_arr = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
+                std_arr = np.array(std, dtype=np.float32).reshape(1, 1, 3)
+                img_array = (img_array - mean_arr) / std_arr
+            
+            # Transpose and add batch dimension
+            img_array = np.transpose(img_array, (2, 0, 1))
+            input_tensor = np.expand_dims(img_array, axis=0)
+            
+            # Run inference
+            logits = run_inference(session, input_tensor)
+            
+            # Generate overlay
+            result = process_segmentation_result(
+                logits,
+                original_frame,
+                original_frame.size
+            )
+            
+            # Convert overlay to OpenCV format (RGB -> BGR)
+            overlay_np = np.array(result['overlay_image'])
+            overlay_bgr = cv2.cvtColor(overlay_np, cv2.COLOR_RGB2BGR)
+            
+            # Write frame
+            out.write(overlay_bgr)
+        
+        cap.release()
+        out.release()
+        
+        print(f"Video processing complete. Total frames: {frame_count}")
+        print(f"Output video saved to: {output_path}")
+        
+        # Re-encode with ffmpeg for better web compatibility
+        final_output = output_path.replace('.mp4', '_web.mp4')
+        try:
+            subprocess.run([
+                'ffmpeg', '-y', '-i', output_path,
+                '-c:v', 'libx264', '-preset', 'fast',
+                '-crf', '23', '-pix_fmt', 'yuv420p',
+                final_output
+            ], check=True, capture_output=True)
+            
+            print(f"Re-encoded video for web: {final_output}")
+            
+            # Remove original and use re-encoded version
+            os.unlink(output_path)
+            return final_output
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"ffmpeg re-encoding failed, using original: {e}")
+            return output_path
+        
+    finally:
+        # Clean up input temp file
+        try:
+            os.unlink(tmp_in_path)
+        except:
+            pass
