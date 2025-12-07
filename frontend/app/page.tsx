@@ -82,66 +82,64 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold">Gynecology Laparoscopic Segmentation</h1>
-          <p className="text-muted-foreground mt-1">
-            Multi-model segmentation for laparoscopic images
-          </p>
+      {/* Compact Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-3 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold">Laparoscopic Segmentation</h1>
+            <p className="text-xs text-muted-foreground">Multi-model AI segmentation</p>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="container mx-auto px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Panel - Controls */}
           <div className="lg:col-span-1">
-            <Card className="p-6 space-y-6 sticky top-8">
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Controls</h2>
+            <Card className="p-4 space-y-4 sticky top-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Settings</h3>
                 
-                <div className="space-y-4">
-                  <ModelSelector
-                    models={models}
-                    selectedId={selectedModelId}
-                    onSelect={setSelectedModelId}
-                    disabled={loading}
-                  />
+              <div className="space-y-4">
+                <ModelSelector
+                  models={models}
+                  selectedId={selectedModelId}
+                  onSelect={setSelectedModelId}
+                  disabled={loading}
+                />
 
-                  <ModeToggle
-                    mode={mode}
-                    onChange={handleModeChange}
-                    disabled={loading}
-                  />
+                <ModeToggle
+                  mode={mode}
+                  onChange={handleModeChange}
+                  disabled={loading}
+                />
 
-                  <FileUpload
-                    mode={mode}
-                    onFileSelect={handleFileSelect}
-                    disabled={loading}
-                  />
+                <FileUpload
+                  mode={mode}
+                  onFileSelect={handleFileSelect}
+                  disabled={loading}
+                />
 
-                  <Button
-                    className="w-full"
-                    onClick={handleSegment}
-                    disabled={!selectedFile || loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      'Run Segmentation'
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  className="w-full"
+                  onClick={handleSegment}
+                  disabled={!selectedFile || loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Run Segmentation'
+                  )}
+                </Button>
               </div>
 
               {/* Error Display */}
               {error && (
-                <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-md text-sm">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
                   <p>{error}</p>
                 </div>
               )}
@@ -149,7 +147,7 @@ export default function Home() {
           </div>
 
           {/* Right Panel - Results */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             {imageResult ? (
               <ImageResults
                 result={imageResult}
@@ -161,12 +159,12 @@ export default function Home() {
                 modelName={selectedModel?.name}
               />
             ) : (
-              <Card className="p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
+              <Card className="p-12 flex flex-col items-center justify-center text-center min-h-[400px] border-dashed">
                 <div className="text-muted-foreground">
-                  <Upload className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No results yet</p>
-                  <p className="text-sm mt-2">
-                    Upload an {mode} and run segmentation to see results
+                  <Upload className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No results yet</p>
+                  <p className="text-xs mt-1">
+                    Upload {mode === 'image' ? 'an image' : 'a video'} and run segmentation
                   </p>
                 </div>
               </Card>
