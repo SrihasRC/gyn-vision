@@ -6,7 +6,6 @@
 import { ImageResult } from '@/lib/types';
 import { Card } from '@/components/ui/card';
 import { Legend } from './Legend';
-import Image from 'next/image';
 
 interface ImageResultsProps {
   result: ImageResult;
@@ -28,7 +27,7 @@ export function ImageResults({ result, modelName }: ImageResultsProps) {
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Original Image</h3>
           <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
-            <Image
+            <img
               src={result.original_image}
               alt="Original"
               className="w-full h-full object-contain"
@@ -39,7 +38,7 @@ export function ImageResults({ result, modelName }: ImageResultsProps) {
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Segmentation Mask</h3>
           <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
-            <Image
+            <img
               src={result.mask_image}
               alt="Mask"
               className="w-full h-full object-contain"
@@ -50,7 +49,7 @@ export function ImageResults({ result, modelName }: ImageResultsProps) {
         <Card className="p-4">
           <h3 className="text-sm font-semibold mb-3">Overlay</h3>
           <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
-            <Image
+            <img
               src={result.overlay_image}
               alt="Overlay"
               className="w-full h-full object-contain"
