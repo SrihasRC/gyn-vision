@@ -122,15 +122,15 @@ def calculate_statistics(mask: np.ndarray) -> List[Dict]:
     
     for class_info in CLASS_METADATA:
         class_id = class_info['id']
-        pixel_count = np.sum(mask == class_id)
+        pixel_count = int(np.sum(mask == class_id))
         area_percent = (pixel_count / total_pixels) * 100
         
         stats.append({
             'id': class_id,
             'name': class_info['name'],
             'color': class_info['color'],
-            'area_percent': round(area_percent, 2),
-            'present': pixel_count > 0
+            'area_percent': round(float(area_percent), 2),
+            'present': bool(pixel_count > 0)
         })
     
     return stats
