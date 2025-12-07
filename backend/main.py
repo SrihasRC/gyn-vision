@@ -4,8 +4,9 @@ FastAPI main application for gynecology laparoscopic segmentation.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-from .core.model_registry import initialize_registry
-from .api.routes import router
+from core.model_registry import initialize_registry
+from api.routes import router
+import uvicorn
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -55,5 +56,4 @@ app.include_router(router)
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -3,9 +3,9 @@ API routes for segmentation endpoints.
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Dict, Any
-from ..core.model_registry import get_registry
-from ..core.preprocessing import preprocess_image, preprocess_video
-from ..core.postprocessing import (
+from core.model_registry import get_registry
+from core.preprocessing import preprocess_image, preprocess_video
+from core.postprocessing import (
     run_inference,
     process_segmentation_result,
     encode_image_to_base64,

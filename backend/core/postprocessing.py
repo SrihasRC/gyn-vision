@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 import cv2
 from typing import Dict, List, Tuple
-from .constants import CLASS_METADATA, COLOR_MAP, NUM_CLASSES
+from core.constants import CLASS_METADATA, COLOR_MAP, NUM_CLASSES
 
 
 def run_inference(session, input_tensor: np.ndarray) -> np.ndarray:
