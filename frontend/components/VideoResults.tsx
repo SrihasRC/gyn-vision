@@ -3,16 +3,14 @@
  */
 'use client';
 
-import { VideoResult } from '@/lib/types';
 import { Card } from '@/components/ui/card';
-import { Legend } from './Legend';
 
 interface VideoResultsProps {
-  result: VideoResult;
+  videoUrl: string;
   modelName?: string;
 }
 
-export function VideoResults({ result, modelName }: VideoResultsProps) {
+export function VideoResults({ videoUrl, modelName }: VideoResultsProps) {
   return (
     <div className="space-y-6">
       <div>
@@ -20,31 +18,25 @@ export function VideoResults({ result, modelName }: VideoResultsProps) {
         {modelName && (
           <p className="text-sm text-muted-foreground">Model: {modelName}</p>
         )}
-        <p className="text-sm text-muted-foreground">
-          Total frames: {result.num_frames}
+      </div>
+
+      {/* Video Player */}
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold mb-3">Segmented Video</h3>
+        <div className="relative w-full rounded-lg overflow-hidden bg-muted">
+          <video
+            src={videoUrl}
+            controls
+            className="w-full h-auto"
+            style={{ maxHeight: '70vh' }}
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Right-click on the video to download
         </p>
-      </div>
-
-      {/* Frames Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {result.frames.map((frame) => (
-          <Card key={frame.index} className="p-4">
-            <h3 className="text-sm font-semibold mb-2">
-              Frame {frame.index} ({frame.time_seconds.toFixed(2)}s)
-            </h3>
-            <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
-              <img
-                src={frame.overlay_image}
-                alt={`Frame ${frame.index}`}
-                className="w-full h-full object-contain"
-              />
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <Legend classes={result.classes} showStats={true} />
+      </Card>
     </div>
   );
 }

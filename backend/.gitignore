@@ -1,1 +1,4 @@
 venv/
+video_chunks*/
+test_video.mp4
+break_video.py

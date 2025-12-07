@@ -2,7 +2,7 @@
  * API client for backend communication
  */
 import axios from 'axios';
-import { Model, ImageResult, VideoResult } from './types';
+import { Model, ImageResult } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -57,7 +57,7 @@ export async function segmentImage(
 export async function segmentVideo(
   file: File,
   modelId: string
-): Promise<VideoResult> {
+): Promise<string> {
   try {
     const formData = new FormData();
     formData.append('file', file);
@@ -70,10 +70,13 @@ export async function segmentVideo(
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        responseType: 'blob'  // Important: get video as blob
       }
     );
 
-    return response.data;
+    // Create a URL for the video blob
+    const videoBlob = new Blob([response.data], { type: 'video/mp4' });
+    return URL.createObjectURL(videoBlob);
   } catch (error: unknown) {
     console.error('Error segmenting video:', error);
     const message = axios.isAxiosError(error) && error.response?.data?.detail 

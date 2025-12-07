@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mode, Model, ImageResult, VideoResult } from '@/lib/types';
+import { Mode, Model, ImageResult } from '@/lib/types';
 import { fetchModels, segmentImage, segmentVideo } from '@/lib/api';
 import { ModelSelector } from '@/components/ModelSelector';
 import { ModeToggle } from '@/components/ModeToggle';
@@ -18,7 +18,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>('image');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
-  const [videoResult, setVideoResult] = useState<VideoResult | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +44,7 @@ export default function Home() {
     setMode(newMode);
     setSelectedFile(null);
     setImageResult(null);
+    setVideoUrl(null);
     setError(null);
   };
 
@@ -60,15 +61,15 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setImageResult(null);
-    setVideoResult(null);
+    setVideoUrl(null);
 
     try {
       if (mode === 'image') {
         const result = await segmentImage(selectedFile, selectedModelId);
         setImageResult(result);
       } else {
-        const result = await segmentVideo(selectedFile, selectedModelId);
-        setVideoResult(result);
+        const url = await segmentVideo(selectedFile, selectedModelId);
+        setVideoUrl(url);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Segmentation failed');
@@ -154,9 +155,9 @@ export default function Home() {
                 result={imageResult}
                 modelName={selectedModel?.name}
               />
-            ) : videoResult ? (
+            ) : videoUrl ? (
               <VideoResults
-                result={videoResult}
+                videoUrl={videoUrl}
                 modelName={selectedModel?.name}
               />
             ) : (

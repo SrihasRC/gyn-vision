@@ -2,17 +2,31 @@
 API routes for segmentation endpoints.
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.background import BackgroundTasks
 from typing import Dict, Any
+import os
 from core.model_registry import get_registry
 from core.preprocessing import preprocess_image, preprocess_video
 from core.postprocessing import (
     run_inference,
     process_segmentation_result,
+    create_video_with_overlay,
     encode_image_to_base64,
     aggregate_video_statistics
 )
 
 router = APIRouter()
+
+
+def cleanup_file(path: str):
+    """Remove temporary file."""
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"Cleaned up: {path}")
+    except Exception as e:
+        print(f"Error cleaning up {path}: {e}")
 
 
 @router.get("/health")
@@ -89,18 +103,19 @@ async def segment_image(
 
 @router.post("/segment/video")
 async def segment_video(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     model_id: str = Form(...)
-) -> Dict[str, Any]:
+):
     """
-    Segment video by processing keyframes.
+    Segment video and return processed video with overlay.
     
     Args:
         file: Uploaded video file
         model_id: Model identifier
         
     Returns:
-        Video segmentation results with frames array
+        Video file with segmentation overlay
     """
     try:
         # Get model
@@ -109,55 +124,38 @@ async def segment_video(
         
         # Read file
         file_bytes = await file.read()
+        print(f"Read {len(file_bytes)} bytes from uploaded file")
         
-        # Preprocess video (sample frames)
-        frames_data = preprocess_video(
+        # Create video with overlay
+        output_path = create_video_with_overlay(
             file_bytes,
-            input_size=config['input_size'],
-            normalize=config['normalize'],
-            mean=config.get('mean'),
-            std=config.get('std'),
-            max_frames=30
+            session,
+            config
+        )
+        print(f"Video created at: {output_path}")
+        
+        # Verify file exists and get size
+        import os
+        if not os.path.exists(output_path):
+            raise Exception(f"Output file does not exist: {output_path}")
+        file_size = os.path.getsize(output_path)
+        print(f"Output file size: {file_size} bytes")
+        
+        # Schedule cleanup after response is sent
+        background_tasks.add_task(cleanup_file, output_path)
+        
+        # Return video file
+        return FileResponse(
+            output_path,
+            media_type="video/mp4",
+            filename=f"segmented_{file.filename}"
         )
         
-        if not frames_data:
-            raise HTTPException(status_code=400, detail="No frames could be extracted")
-        
-        # Process each frame
-        processed_frames = []
-        all_stats = []
-        
-        for frame_data in frames_data:
-            # Run inference
-            logits = run_inference(session, frame_data['input_tensor'])
-            
-            # Postprocess
-            result = process_segmentation_result(
-                logits,
-                frame_data['original_frame'],
-                frame_data['original_frame'].size
-            )
-            
-            all_stats.append(result['statistics'])
-            
-            # Store frame result
-            processed_frames.append({
-                'index': frame_data['index'],
-                'time_seconds': frame_data['time_seconds'],
-                'overlay_image': encode_image_to_base64(result['overlay_image'])
-            })
-        
-        # Aggregate statistics
-        aggregated_stats = aggregate_video_statistics(all_stats)
-        
-        return {
-            "model_id": model_id,
-            "num_frames": len(processed_frames),
-            "classes": aggregated_stats,
-            "frames": processed_frames
-        }
-        
     except KeyError as e:
+        print(f"KeyError: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        print(f"Exception in segment_video: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
