@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mode, Model, ImageResult } from '@/lib/types';
-import { fetchModels, segmentImage } from '@/lib/api';
+import { Mode, Model, ImageResult, VideoResult } from '@/lib/types';
+import { fetchModels, segmentImage, segmentVideo } from '@/lib/api';
 import { ModelSelector } from '@/components/ModelSelector';
 import { ModeToggle } from '@/components/ModeToggle';
 import { FileUpload } from '@/components/FileUpload';
 import { ImageResults } from '@/components/ImageResults';
+import { VideoResults } from '@/components/VideoResults';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, Upload } from 'lucide-react';
@@ -17,6 +18,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>('image');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
+  const [videoResult, setVideoResult] = useState<VideoResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,13 +60,16 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setImageResult(null);
+    setVideoResult(null);
 
     try {
       if (mode === 'image') {
         const result = await segmentImage(selectedFile, selectedModelId);
         setImageResult(result);
+      } else {
+        const result = await segmentVideo(selectedFile, selectedModelId);
+        setVideoResult(result);
       }
-      // Video mode will be added later
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Segmentation failed');
     } finally {
@@ -147,6 +152,11 @@ export default function Home() {
             {imageResult ? (
               <ImageResults
                 result={imageResult}
+                modelName={selectedModel?.name}
+              />
+            ) : videoResult ? (
+              <VideoResults
+                result={videoResult}
                 modelName={selectedModel?.name}
               />
             ) : (
