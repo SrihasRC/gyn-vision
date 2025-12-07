@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Mode, Model, ImageResult } from '@/lib/types';
 import { fetchModels, segmentImage, segmentVideo } from '@/lib/api';
 import { ModelSelector } from '@/components/ModelSelector';
@@ -8,10 +9,9 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { FileUpload } from '@/components/FileUpload';
 import { ImageResults } from '@/components/ImageResults';
 import { VideoResults } from '@/components/VideoResults';
-import { Navbar } from '@/components/Navbar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, Upload } from 'lucide-react';
+import { Loader2, AlertCircle, Upload, ArrowLeft } from 'lucide-react';
 
 export default function SegmentationPage() {
   const [models, setModels] = useState<Model[]>([]);
@@ -82,23 +82,30 @@ export default function SegmentationPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {/* Header with Back Button */}
+      <header className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </Link>
+          <div className="border-l h-8 mx-2" />
+          <div>
+            <h1 className="text-lg font-bold">Segmentation Tool</h1>
+            <p className="text-xs text-muted-foreground">Upload and analyze laparoscopic images or videos</p>
+          </div>
+        </div>
+      </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8 pt-24">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-2">Segmentation Tool</h1>
-          <p className="text-sm text-muted-foreground">Upload and analyze laparoscopic images or videos</p>
-        </div>
-        
+      <main className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Panel - Controls */}
           <div className="lg:col-span-1">
-            <Card className="p-5 space-y-5 sticky top-24 shadow-lg">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-primary mb-1">Configuration</h2>
-                <p className="text-xs text-muted-foreground">Select model and upload file</p>
-              </div>
+            <Card className="p-4 space-y-4 sticky top-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Settings</h3>
                 
               <div className="space-y-4">
                 <ModelSelector
