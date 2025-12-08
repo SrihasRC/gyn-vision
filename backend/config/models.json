@@ -35,6 +35,30 @@
       "normalize": true,
       "mean": [0.485, 0.456, 0.406],
       "std": [0.229, 0.224, 0.225]
+    },
+    {
+      "id": "yolo_seg",
+      "name": "YOLO Segmentation",
+      "description": "YOLO instance segmentation model",
+      "type": "yolo",
+      "onnx_path": "models/yolov11m_seg.onnx",
+      "input_size": 640,
+      "num_classes": 4,
+      "normalize": true,
+      "mean": [0.0, 0.0, 0.0],
+      "std": [1.0, 1.0, 1.0]
+    },
+    {
+      "id": "segformer_b0_round2",
+      "name": "SegFormer B0 Round 2",
+      "description": "SegFormer-B0 trained on 7 surgical classes (8 total including background)",
+      "type": "segformer",
+      "onnx_path": "models/segformer_b0_round2.onnx",
+      "input_size": 512,
+      "num_classes": 8,
+      "normalize": true,
+      "mean": [0.5, 0.5, 0.5],
+      "std": [0.5, 0.5, 0.5]
     }
   ]
 }

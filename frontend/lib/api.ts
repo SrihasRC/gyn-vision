@@ -2,7 +2,7 @@
  * API client for backend communication
  */
 import axios from 'axios';
-import { Model, ImageResult } from './types';
+import { Model, ImageResult, ClassInfo } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -16,6 +16,19 @@ export async function fetchModels(): Promise<Model[]> {
   } catch (error) {
     console.error('Error fetching models:', error);
     throw new Error('Failed to fetch models');
+  }
+}
+
+/**
+ * Fetch class metadata for a specific model
+ */
+export async function fetchModelClasses(modelId: string): Promise<ClassInfo[]> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/models/${modelId}/classes`);
+    return response.data.classes;
+  } catch (error) {
+    console.error('Error fetching model classes:', error);
+    throw new Error('Failed to fetch model classes');
   }
 }
 

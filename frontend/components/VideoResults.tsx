@@ -7,13 +7,15 @@ import { Card } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoLegend } from './VideoLegend';
+import { ClassInfo } from '@/lib/types';
 
 interface VideoResultsProps {
   videoUrl: string;
   modelName?: string;
+  classes?: ClassInfo[];
 }
 
-export function VideoResults({ videoUrl, modelName }: VideoResultsProps) {
+export function VideoResults({ videoUrl, modelName, classes }: VideoResultsProps) {
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = videoUrl;
@@ -61,7 +63,7 @@ export function VideoResults({ videoUrl, modelName }: VideoResultsProps) {
       </Card>
 
       {/* Legend */}
-      <VideoLegend />
+      <VideoLegend classes={classes} />
     </div>
   );
 }

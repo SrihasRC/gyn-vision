@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Mode, Model, ImageResult } from '@/lib/types';
-import { fetchModels, segmentImage, segmentVideo } from '@/lib/api';
+import { Mode, Model, ImageResult, ClassInfo } from '@/lib/types';
+import { fetchModels, segmentImage, segmentVideo, fetchModelClasses } from '@/lib/api';
 import { ModelSelector } from '@/components/ModelSelector';
 import { ModeToggle } from '@/components/ModeToggle';
 import { FileUpload } from '@/components/FileUpload';
@@ -20,6 +20,7 @@ export default function SegmentationPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoClasses, setVideoClasses] = useState<ClassInfo[] | undefined>(undefined);
   const [sampleRate, setSampleRate] = useState<number>(15); // Default: ~2fps (every 15th frame)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +72,14 @@ export default function SegmentationPage() {
       } else {
         const url = await segmentVideo(selectedFile, selectedModelId, sampleRate);
         setVideoUrl(url);
+        // Fetch class metadata for the model
+        try {
+          const classes = await fetchModelClasses(selectedModelId);
+          setVideoClasses(classes);
+        } catch (e) {
+          console.error('Failed to fetch model classes:', e);
+          // Continue even if classes fetch fails - will use defaults
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Segmentation failed');
@@ -233,6 +242,7 @@ export default function SegmentationPage() {
               <VideoResults
                 videoUrl={videoUrl}
                 modelName={selectedModel?.name}
+                classes={videoClasses}
               />
             ) : (
               <Card className="p-16 flex flex-col items-center justify-center text-center min-h-[500px] border-dashed">

@@ -48,6 +48,33 @@ async def get_models() -> Dict[str, Any]:
     return {"models": models}
 
 
+@router.get("/models/{model_id}/classes")
+async def get_model_classes(model_id: str) -> Dict[str, Any]:
+    """
+    Get class metadata for a specific model.
+    
+    Args:
+        model_id: Model identifier
+        
+    Returns:
+        Dict with classes array containing class metadata
+    """
+    try:
+        from core.constants import get_class_metadata
+        
+        registry = get_registry()
+        _, config = registry.get_model(model_id)
+        
+        num_classes = config.get('num_classes', 4)
+        class_metadata = get_class_metadata(num_classes)
+        
+        return {"classes": class_metadata}
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
 @router.post("/segment/image")
 async def segment_image(
     file: UploadFile = File(...),
@@ -81,10 +108,18 @@ async def segment_image(
         )
         
         # Run inference
-        logits = run_inference(session, input_tensor)
+        model_type = config.get('type', 'segformer')
+        logits = run_inference(session, input_tensor, model_type)
         
         # Postprocess
-        result = process_segmentation_result(logits, original_image, original_size)
+        result = process_segmentation_result(
+            logits, 
+            original_image, 
+            original_size,
+            model_type=model_type,
+            input_shape=(config['input_size'], config['input_size']),
+            num_classes=config.get('num_classes', 4)
+        )
         
         # Encode images
         return {

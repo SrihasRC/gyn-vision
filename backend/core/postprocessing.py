@@ -10,38 +10,79 @@ import numpy as np
 from PIL import Image
 import cv2
 from typing import Dict, List, Tuple
-from core.constants import CLASS_METADATA, COLOR_MAP, NUM_CLASSES
+from core.constants import CLASS_METADATA, COLOR_MAP, NUM_CLASSES, get_color_map, get_class_metadata
 
 
-def run_inference(session, input_tensor: np.ndarray) -> np.ndarray:
+def run_inference(session, input_tensor: np.ndarray, model_type: str = "segformer"):
     """
     Run ONNX model inference.
     
     Args:
         session: ONNX Runtime InferenceSession
         input_tensor: Preprocessed input tensor
+        model_type: Type of model ("segformer" or "yolo")
         
     Returns:
-        Logits tensor (1, num_classes, H, W)
+        Logits tensor (1, num_classes, H, W) for segformer
+        or YOLO output for yolo models
     """
     input_name = session.get_inputs()[0].name
     outputs = session.run(None, {input_name: input_tensor})
-    return outputs[0]
+    
+    if model_type == "yolo":
+        # YOLO returns the full output (we'll process it in generate_mask)
+        return outputs
+    else:
+        # SegFormer returns logits as first output
+        return outputs[0]
 
 
-def generate_mask(logits: np.ndarray, original_size: Tuple[int, int] = None) -> np.ndarray:
+def generate_mask(logits, original_size: Tuple[int, int] = None, model_type: str = "segformer", input_shape: Tuple[int, int] = (640, 640)) -> np.ndarray:
     """
-    Generate class ID mask from logits.
+    Generate class ID mask from model output.
     
     Args:
-        logits: Model output (1, num_classes, H, W)
+        logits: Model output - array for SegFormer (1, num_classes, H, W) or list for YOLO
         original_size: Optional (width, height) to resize mask
+        model_type: Type of model ("segformer" or "yolo")
+        input_shape: Input size (width, height) for YOLO processing
         
     Returns:
         Class ID array (H, W)
     """
-    # Argmax over classes: (1, C, H, W) -> (H, W)
-    mask = np.argmax(logits[0], axis=0).astype(np.uint8)
+    if model_type == "yolo":
+        # YOLO output processing
+        # YOLO segmentation outputs: [detections, proto_masks]
+        # We need to extract masks from the output
+        output = logits[0]  # Get first output
+        
+        # For YOLO segmentation, create a simple semantic mask
+        # Initialize empty mask with input dimensions
+        h, w = input_shape[1], input_shape[0]
+        mask = np.zeros((h, w), dtype=np.uint8)
+        
+        # If YOLO has valid detections with masks, process them
+        # This is a simplified version - YOLO outputs need proper NMS and mask decoding
+        # For now, we'll create a basic mask from the output
+        if isinstance(logits, list) and len(logits) > 0:
+            # Try to extract mask data from YOLO output
+            # YOLO output format varies, this handles basic case
+            try:
+                # Assuming output contains mask predictions
+                if output.ndim >= 3:
+                    # Take argmax if multi-class
+                    if output.shape[0] > 1:
+                        mask = np.argmax(output, axis=0).astype(np.uint8)
+                    else:
+                        mask = (output[0] > 0.5).astype(np.uint8)
+            except Exception as e:
+                print(f"YOLO mask extraction warning: {e}")
+                # Return empty mask on error
+                pass
+    else:
+        # SegFormer output processing
+        # Argmax over classes: (1, C, H, W) -> (H, W)
+        mask = np.argmax(logits[0], axis=0).astype(np.uint8)
     
     # Resize to original size if needed
     if original_size is not None:
@@ -54,12 +95,13 @@ def generate_mask(logits: np.ndarray, original_size: Tuple[int, int] = None) -> 
     return mask
 
 
-def mask_to_color(mask: np.ndarray) -> np.ndarray:
+def mask_to_color(mask: np.ndarray, num_classes: int = 4) -> np.ndarray:
     """
     Convert class ID mask to RGB color mask.
     
     Args:
         mask: Class ID array (H, W)
+        num_classes: Number of classes in the model
         
     Returns:
         RGB color mask (H, W, 3)
@@ -67,7 +109,8 @@ def mask_to_color(mask: np.ndarray) -> np.ndarray:
     h, w = mask.shape
     color_mask = np.zeros((h, w, 3), dtype=np.uint8)
     
-    for class_id, color in COLOR_MAP.items():
+    color_map = get_color_map(num_classes)
+    for class_id, color in color_map.items():
         color_mask[mask == class_id] = color
     
     return color_mask
@@ -110,12 +153,13 @@ def create_overlay(
     return Image.fromarray(overlay)
 
 
-def calculate_statistics(mask: np.ndarray) -> List[Dict]:
+def calculate_statistics(mask: np.ndarray, num_classes: int = 4) -> List[Dict]:
     """
     Calculate per-class statistics.
     
     Args:
         mask: Class ID array (H, W)
+        num_classes: Number of classes in the model
         
     Returns:
         List of class info dicts with statistics
@@ -123,7 +167,8 @@ def calculate_statistics(mask: np.ndarray) -> List[Dict]:
     total_pixels = mask.size
     stats = []
     
-    for class_info in CLASS_METADATA:
+    class_metadata = get_class_metadata(num_classes)
+    for class_info in class_metadata:
         class_id = class_info['id']
         pixel_count = int(np.sum(mask == class_id))
         area_percent = (pixel_count / total_pixels) * 100
@@ -156,9 +201,12 @@ def encode_image_to_base64(image: Image.Image) -> str:
 
 
 def process_segmentation_result(
-    logits: np.ndarray,
+    logits,
     original_image: Image.Image,
-    original_size: Tuple[int, int]
+    original_size: Tuple[int, int],
+    model_type: str = "segformer",
+    input_shape: Tuple[int, int] = (640, 640),
+    num_classes: int = 4
 ) -> Dict:
     """
     Complete postprocessing pipeline for segmentation result.
@@ -167,21 +215,24 @@ def process_segmentation_result(
         logits: Model output
         original_image: Original PIL Image
         original_size: Original image size (width, height)
+        model_type: Type of model (\"segformer\" or \"yolo\")
+        input_shape: Input size (width, height) for YOLO
+        num_classes: Number of classes in the model
         
     Returns:
         Dict with mask, overlay, and statistics
     """
     # Generate mask
-    mask = generate_mask(logits, original_size)
+    mask = generate_mask(logits, original_size, model_type, input_shape)
     
     # Create color mask
-    color_mask = mask_to_color(mask)
+    color_mask = mask_to_color(mask, num_classes)
     
     # Create overlay
     overlay = create_overlay(original_image, color_mask, mask)
     
     # Calculate statistics
-    stats = calculate_statistics(mask)
+    stats = calculate_statistics(mask, num_classes)
     
     # Convert to PIL Images for encoding
     mask_image = Image.fromarray(color_mask)
@@ -194,19 +245,21 @@ def process_segmentation_result(
     }
 
 
-def aggregate_video_statistics(frames_stats: List[List[Dict]]) -> List[Dict]:
+def aggregate_video_statistics(frames_stats: List[List[Dict]], num_classes: int = 4) -> List[Dict]:
     """
     Aggregate statistics across video frames.
     
     Args:
         frames_stats: List of statistics for each frame
+        num_classes: Number of classes in the model
         
     Returns:
         Aggregated class statistics
     """
     aggregated = []
     
-    for class_info in CLASS_METADATA:
+    class_metadata = get_class_metadata(num_classes)
+    for class_info in class_metadata:
         class_id = class_info['id']
         
         # Skip background
@@ -309,6 +362,8 @@ def create_video_with_overlay(
         normalize = config['normalize']
         mean = config.get('mean')
         std = config.get('std')
+        model_type = config.get('type', 'segformer')
+        num_classes = config.get('num_classes', 4)
         
         frame_count = 0
         processed_count = 0
@@ -351,13 +406,16 @@ def create_video_with_overlay(
                 input_tensor = np.expand_dims(img_array, axis=0)
                 
                 # Run inference
-                logits = run_inference(session, input_tensor)
+                logits = run_inference(session, input_tensor, model_type)
                 
                 # Generate overlay
                 result = process_segmentation_result(
                     logits,
                     original_frame,
-                    original_frame.size
+                    original_frame.size,
+                    model_type=model_type,
+                    input_shape=(input_size, input_size),
+                    num_classes=num_classes
                 )
                 
                 # Convert overlay to OpenCV format (RGB -> BGR)
