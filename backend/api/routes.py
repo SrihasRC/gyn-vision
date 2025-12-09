@@ -2,10 +2,11 @@
 API routes for segmentation endpoints.
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.background import BackgroundTasks
 from typing import Dict, Any
 import os
+import json
 from core.model_registry import get_registry
 from core.preprocessing import preprocess_image, preprocess_video
 from core.postprocessing import (
@@ -15,6 +16,7 @@ from core.postprocessing import (
     encode_image_to_base64,
     aggregate_video_statistics
 )
+from core.streaming import stream_video_segmentation
 
 router = APIRouter()
 
@@ -197,6 +199,66 @@ async def segment_video(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         print(f"Exception in segment_video: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+
+
+@router.post("/segment/video/stream")
+async def segment_video_stream(
+    file: UploadFile = File(...),
+    model_id: str = Form(...),
+    sample_rate: int = Form(15)
+):
+    """
+    Segment video with real-time streaming of processed frames.
+    
+    Args:
+        file: Uploaded video file
+        model_id: Model identifier
+        sample_rate: Process every Nth frame (1-30, default 15 for ~15x speedup)
+        
+    Returns:
+        Server-Sent Events stream of processed frames
+    """
+    try:
+        # Validate sample_rate
+        sample_rate = max(1, min(30, sample_rate))
+        
+        # Get model
+        registry = get_registry()
+        session, config = registry.get_model(model_id)
+        
+        # Read file
+        file_bytes = await file.read()
+        print(f"Starting stream for {len(file_bytes)} bytes")
+        
+        async def generate():
+            """Generate SSE events for each processed frame."""
+            for frame_data in stream_video_segmentation(
+                file_bytes,
+                session,
+                config,
+                sample_rate=sample_rate
+            ):
+                # Format as Server-Sent Event
+                yield f"data: {json.dumps(frame_data)}\n\n"
+        
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+        
+    except KeyError as e:
+        print(f"KeyError: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        print(f"Exception in segment_video_stream: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")

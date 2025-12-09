@@ -65,7 +65,87 @@ export async function segmentImage(
 }
 
 /**
- * Segment a video
+ * Segment a video with real-time streaming
+ */
+export async function segmentVideoStream(
+  file: File,
+  modelId: string,
+  sampleRate: number = 15,
+  onFrame: (frameData: {
+    type: string;
+    frame_index?: number;
+    total_frames?: number;
+    frame_data?: string;
+    progress?: number;
+    fps?: number;
+    width?: number;
+    height?: number;
+  }) => void,
+  onError: (error: Error) => void,
+  onComplete: () => void
+): Promise<void> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('model_id', modelId);
+    formData.append('sample_rate', sampleRate.toString());
+
+    const response = await fetch(`${API_BASE_URL}/segment/video/stream`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Failed to get response reader');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        onComplete();
+        break;
+      }
+
+      // Decode chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE messages
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            onFrame(data);
+            
+            if (data.type === 'complete') {
+              onComplete();
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in video stream:', error);
+    onError(error instanceof Error ? error : new Error('Stream failed'));
+  }
+}
+
+/**
+ * Segment a video (legacy - returns complete video)
  */
 export async function segmentVideo(
   file: File,

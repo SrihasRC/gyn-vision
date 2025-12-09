@@ -59,6 +59,18 @@
       "normalize": true,
       "mean": [0.5, 0.5, 0.5],
       "std": [0.5, 0.5, 0.5]
+    },
+    {
+      "id": "segformer_b1_round2",
+      "name": "SegFormer B1 Round 2",
+      "description": "SegFormer-B1 trained on 7 surgical classes - balanced speed and accuracy",
+      "type": "segformer",
+      "onnx_path": "models/segformer_b1_round2.onnx",
+      "input_size": 512,
+      "num_classes": 8,
+      "normalize": true,
+      "mean": [0.5, 0.5, 0.5],
+      "std": [0.5, 0.5, 0.5]
     }
   ]
 }

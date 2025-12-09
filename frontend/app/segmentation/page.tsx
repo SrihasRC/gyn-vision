@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Mode, Model, ImageResult, ClassInfo } from '@/lib/types';
-import { fetchModels, segmentImage, segmentVideo, fetchModelClasses } from '@/lib/api';
+import { fetchModels, segmentImage, segmentVideo, fetchModelClasses, segmentVideoStream } from '@/lib/api';
 import { ModelSelector } from '@/components/ModelSelector';
 import { ModeToggle } from '@/components/ModeToggle';
 import { FileUpload } from '@/components/FileUpload';
 import { ImageResults } from '@/components/ImageResults';
 import { VideoResults } from '@/components/VideoResults';
+import { StreamingVideoResults } from '@/components/StreamingVideoResults';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, Upload, ArrowLeft } from 'lucide-react';
@@ -21,6 +22,10 @@ export default function SegmentationPage() {
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoClasses, setVideoClasses] = useState<ClassInfo[] | undefined>(undefined);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamProgress, setStreamProgress] = useState(0);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [totalFrames, setTotalFrames] = useState(0);
   const [sampleRate, setSampleRate] = useState<number>(15); // Default: ~2fps (every 15th frame)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,22 +69,58 @@ export default function SegmentationPage() {
     setError(null);
     setImageResult(null);
     setVideoUrl(null);
+    setIsStreaming(false);
+    setStreamProgress(0);
+    setCurrentFrame(0);
+    setTotalFrames(0);
 
     try {
       if (mode === 'image') {
         const result = await segmentImage(selectedFile, selectedModelId);
         setImageResult(result);
       } else {
-        const url = await segmentVideo(selectedFile, selectedModelId, sampleRate);
-        setVideoUrl(url);
+        // Use streaming for video
+        setIsStreaming(true);
+        setLoading(false); // Show streaming UI instead of loading
+        
         // Fetch class metadata for the model
         try {
           const classes = await fetchModelClasses(selectedModelId);
           setVideoClasses(classes);
         } catch (e) {
           console.error('Failed to fetch model classes:', e);
-          // Continue even if classes fetch fails - will use defaults
         }
+
+        await segmentVideoStream(
+          selectedFile,
+          selectedModelId,
+          sampleRate,
+          (frameData) => {
+            if (frameData.type === 'metadata') {
+              setTotalFrames(frameData.total_frames || 0);
+              // Pass metadata to canvas
+              if ((window as any).setStreamMetadata) {
+                (window as any).setStreamMetadata(frameData);
+              }
+            } else if (frameData.type === 'frame') {
+              setCurrentFrame(frameData.frame_index || 0);
+              setStreamProgress(frameData.progress || 0);
+              // Update canvas with new frame
+              if ((window as any).updateStreamCanvas && frameData.frame_data) {
+                (window as any).updateStreamCanvas(frameData.frame_data);
+              }
+            }
+          },
+          (error) => {
+            setError(error.message);
+            setIsStreaming(false);
+            setLoading(false);
+          },
+          () => {
+            setIsStreaming(false);
+            setLoading(false);
+          }
+        );
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Segmentation failed');
@@ -237,6 +278,15 @@ export default function SegmentationPage() {
               <ImageResults
                 result={imageResult}
                 modelName={selectedModel?.name}
+              />
+            ) : isStreaming || (currentFrame > 0 && !videoUrl) ? (
+              <StreamingVideoResults
+                modelName={selectedModel?.name}
+                classes={videoClasses}
+                isStreaming={isStreaming}
+                progress={streamProgress}
+                currentFrame={currentFrame}
+                totalFrames={totalFrames}
               />
             ) : videoUrl ? (
               <VideoResults
