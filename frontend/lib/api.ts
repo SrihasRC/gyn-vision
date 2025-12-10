@@ -82,7 +82,8 @@ export async function segmentVideoStream(
     height?: number;
   }) => void,
   onError: (error: Error) => void,
-  onComplete: () => void
+  onComplete: () => void,
+  abortSignal?: AbortSignal
 ): Promise<void> {
   try {
     const formData = new FormData();
@@ -93,6 +94,7 @@ export async function segmentVideoStream(
     const response = await fetch(`${API_BASE_URL}/segment/video/stream`, {
       method: 'POST',
       body: formData,
+      signal: abortSignal, // Pass abort signal to fetch
     });
 
     if (!response.ok) {
@@ -140,6 +142,11 @@ export async function segmentVideoStream(
     }
   } catch (error) {
     console.error('Error in video stream:', error);
+    // Don't call onError if the request was aborted by user
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Stream aborted by user');
+      return;
+    }
     onError(error instanceof Error ? error : new Error('Stream failed'));
   }
 }

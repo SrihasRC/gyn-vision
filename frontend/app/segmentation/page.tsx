@@ -26,6 +26,7 @@ export default function SegmentationPage() {
   const [streamProgress, setStreamProgress] = useState(0);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
+  const [streamAbortController, setStreamAbortController] = useState<AbortController | null>(null);
   const [sampleRate, setSampleRate] = useState<number>(15); // Default: ~2fps (every 15th frame)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,12 +74,21 @@ export default function SegmentationPage() {
     setStreamProgress(0);
     setCurrentFrame(0);
     setTotalFrames(0);
+    
+    // Cancel any existing stream
+    if (streamAbortController) {
+      streamAbortController.abort();
+    }
 
     try {
       if (mode === 'image') {
         const result = await segmentImage(selectedFile, selectedModelId);
         setImageResult(result);
       } else {
+        // Create abort controller for this stream
+        const abortController = new AbortController();
+        setStreamAbortController(abortController);
+        
         // Use streaming for video
         setIsStreaming(true);
         setLoading(false); // Show streaming UI instead of loading
@@ -96,6 +106,9 @@ export default function SegmentationPage() {
           selectedModelId,
           sampleRate,
           (frameData) => {
+            // Check if aborted
+            if (abortController.signal.aborted) return;
+            
             if (frameData.type === 'metadata') {
               setTotalFrames(frameData.total_frames || 0);
               // Pass metadata to canvas
@@ -112,20 +125,58 @@ export default function SegmentationPage() {
             }
           },
           (error) => {
-            setError(error.message);
+            if (!abortController.signal.aborted) {
+              setError(error.message);
+            }
             setIsStreaming(false);
             setLoading(false);
+            setStreamAbortController(null);
           },
           () => {
             setIsStreaming(false);
             setLoading(false);
-          }
+            setStreamAbortController(null);
+          },
+          abortController.signal // Pass abort signal
         );
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Segmentation failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle clearing results
+  const handleClear = () => {
+    // Abort streaming if active
+    if (streamAbortController) {
+      try {
+        streamAbortController.abort();
+      } catch (error) {
+        // Ignore abort errors - they're expected
+        console.log('Stream aborted by user');
+      }
+      setStreamAbortController(null);
+    }
+    
+    setImageResult(null);
+    setVideoUrl(null);
+    setIsStreaming(false);
+    setStreamProgress(0);
+    setCurrentFrame(0);
+    setTotalFrames(0);
+    setError(null);
+    
+    // Clear canvas
+    if ((window as any).updateStreamCanvas) {
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
     }
   };
 
@@ -287,6 +338,7 @@ export default function SegmentationPage() {
                 progress={streamProgress}
                 currentFrame={currentFrame}
                 totalFrames={totalFrames}
+                onClear={handleClear}
               />
             ) : videoUrl ? (
               <VideoResults

@@ -5,9 +5,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { VideoLegend } from './VideoLegend';
 import { ClassInfo } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 
 interface StreamingVideoResultsProps {
   modelName?: string;
@@ -16,6 +17,7 @@ interface StreamingVideoResultsProps {
   progress: number;
   currentFrame: number;
   totalFrames: number;
+  onClear?: () => void;
 }
 
 export function StreamingVideoResults({
@@ -24,7 +26,8 @@ export function StreamingVideoResults({
   isStreaming,
   progress,
   currentFrame,
-  totalFrames
+  totalFrames,
+  onClear
 }: StreamingVideoResultsProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fps, setFps] = useState<number>(0);
@@ -84,12 +87,25 @@ export function StreamingVideoResults({
             </p>
           )}
         </div>
-        {isStreaming && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Processing...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isStreaming && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Processing...</span>
+            </div>
+          )}
+          {onClear && (
+            <Button 
+              onClick={onClear}
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Progress Bar */}
